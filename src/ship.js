@@ -50,6 +50,13 @@ export class Ship {
     const dir = norm(steerToward(len(this.vel) > 1 ? this.vel : fwd, fwd, Math.min(1, GRIP * dt)));
     this.vel = scale(dir.x || dir.y ? dir : fwd, speed);
 
+    // External gravity: zero for the cruise levels, a steady pull for the gravity
+    // mazes. Added after the carve so the player has to aim into it to hold a line.
+    const g = level.gravity;
+    if (g && (g.x || g.y)) {
+      this.vel = { x: this.vel.x + g.x * dt, y: this.vel.y + g.y * dt };
+    }
+
     // Integrate, then push out of any walls.
     this.pos = add(this.pos, scale(this.vel, dt));
     this._collide(level, dt);

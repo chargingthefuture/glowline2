@@ -11,6 +11,7 @@ export class Level {
     this.finishX = def.finishX;
     this.bounds = def.bounds;
     this.checkpoints = def.checkpoints || [];
+    this.gravity = def.gravity || { x: 0, y: 0 };
 
     this.segments = [];
     for (const poly of def.walls) {

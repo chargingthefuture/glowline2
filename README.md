@@ -33,8 +33,11 @@ The boost only fires when the meter has charge. Fill it by sliding along the neo
 
 ## Levels
 
-Three hand-tuned mazes of rising difficulty — *First Light*, *Switchback*, and *The Gauntlet*. Each
-tracks a best time in your browser's local storage; nothing is sent anywhere.
+Five hand-tuned mazes of rising difficulty. The first three — *First Light*, *Switchback*, and *The
+Gauntlet* — are top-down cruises where you carve the corridor and ride the walls. The last two —
+*Gravity Well* and *Undertow* — add a steady downward pull: you steer up to hold your line and grind
+the roof or floor to keep the boost charged. Each level tracks a best time in your browser's local
+storage; nothing is sent anywhere.
 
 ## How it fits together
 
@@ -59,7 +62,7 @@ Plain HTML, CSS, and JavaScript (ES modules) — no framework, no bundler, no de
 - **Tune the feel** in `src/ship.js` — the constants at the top control turn rate, top speed, boost,
   and how much a grind rewards you.
 - **Add or reshape a level** in `src/levels.js` — a level is a centreline, a half-width, and any
-  pillars you drop in.
+  pillars you drop in. Add a `gravity: { x, y }` field to make it a gravity maze.
 
 There is no automated test suite. After changing physics or a level, play it in a browser and confirm
 the maze can still be completed before opening a pull request.
