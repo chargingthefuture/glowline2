@@ -95,4 +95,58 @@ function level3() {
   };
 }
 
-export const LEVELS = [level1(), level2(), level3()];
+// --- Level 4: gravity. A wide cave that pulls you down; aim up to hold a line,
+// and grind the ceiling or floor to keep the boost topped up. ------------
+function level4() {
+  const length = 6600;
+  const mid = (x) => 520 + Math.sin(x / 900) * 60;
+  const half = () => 175;
+  const { top, bottom } = corridor({ length, mid, half });
+  const walls = [top, bottom];
+  for (let x = 1200; x < length - 700; x += 780) {
+    const ceiling = ((x / 780) | 0) % 2 === 0;
+    const m = mid(x);
+    const y = ceiling ? m - 175 + 60 : m + 175 - 60; // stalactite from the roof / stalagmite from the floor
+    walls.push(pillar(x, y, 34, 74, 4, Math.PI / 4));
+  }
+  return {
+    name: 'Gravity Well',
+    theme: { wall: '#ffb020', glow: 'rgba(255,176,32,0.5)', accent: '#ffd98a' },
+    par: 40,
+    gravity: { x: 0, y: 250 },
+    start: { x: 120, y: mid(120), angle: 0 },
+    finishX: length - 200,
+    bounds: { left: -80, right: length + 80, top: -400, bottom: 1400 },
+    checkpoints: [1500, 3000, 4500, 5800],
+    walls,
+  };
+}
+
+// --- Level 5: heavier gravity, a tighter cave, obstacles from both sides. -
+function level5() {
+  const length = 7000;
+  const mid = (x) => 540 + Math.sin(x / 780) * 90 + Math.sin(x / 240) * 20;
+  const half = (x) => 138 - Math.sin(x / 800) * 12;
+  const { top, bottom } = corridor({ length, mid, half });
+  const walls = [top, bottom];
+  for (let x = 1000; x < length - 700; x += 560) {
+    const ceiling = ((x / 560) | 0) % 2 === 0;
+    const m = mid(x);
+    const h = half(x);
+    const y = ceiling ? m - h + 48 : m + h - 48;
+    walls.push(pillar(x, y, 30, 62, 4, Math.PI / 4));
+  }
+  return {
+    name: 'Undertow',
+    theme: { wall: '#ff7043', glow: 'rgba(255,112,67,0.5)', accent: '#ffb59b' },
+    par: 48,
+    gravity: { x: 0, y: 340 },
+    start: { x: 120, y: mid(120), angle: 0 },
+    finishX: length - 220,
+    bounds: { left: -80, right: length + 80, top: -500, bottom: 1500 },
+    checkpoints: [1400, 2800, 4200, 5600, 6600],
+    walls,
+  };
+}
+
+export const LEVELS = [level1(), level2(), level3(), level4(), level5()];
