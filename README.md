@@ -21,6 +21,14 @@ There is no build step. Two ways to run it:
 
 - **Host it as a static site** (for example GitHub Pages): serve the repository root as-is.
 
+## Deploying to GitHub Pages
+
+The repository ships a workflow (`.github/workflows/deploy-pages.yml`) that publishes the site on
+every push to `main`. There is nothing to build — it uploads the repository root and hands it to
+Pages. One-time setup in the repository: open **Settings → Pages → Build and deployment** and set the
+**Source** to **GitHub Actions**. After that, each push to `main` deploys automatically, and the live
+address shows up on the workflow run and under Settings → Pages.
+
 ## Controls
 
 | Action | Keyboard | Touch |

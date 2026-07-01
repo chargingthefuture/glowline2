@@ -1,0 +1,46 @@
+# Publishes the static site to GitHub Pages on every push to main.
+# The game is plain static files, so there is nothing to build — this uploads the
+# repository root as-is and hands it to Pages.
+#
+# One-time setup in the repository: Settings -> Pages -> Build and deployment ->
+# Source: "GitHub Actions". After that, each push to main deploys automatically.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Let this workflow publish to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a newer push cancels an in-progress run.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
