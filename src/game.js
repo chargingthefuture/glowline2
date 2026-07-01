@@ -95,6 +95,7 @@ export class Game {
   }
 
   _update(dt) {
+    this.input.poll(); // refresh gamepad state before anything reads it this frame
     this.showTouch = this.input.usingTouch;
 
     if (this.input.consumeMuteToggle()) {

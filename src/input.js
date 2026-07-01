@@ -1,7 +1,11 @@
-// Player input: keyboard and touch. The game reads a steer/boost sample each frame
-// and asks whether a one-shot action (restart) fired. On-screen touch buttons are
-// laid out by the game (so they match what gets drawn); this module only hit-tests
-// pointers against those rectangles.
+// Player input: keyboard, touch, and gamepad. The game reads a steer/boost sample
+// each frame and asks whether a one-shot action (restart / mute) fired. On-screen
+// touch buttons are laid out by the game (so they match what gets drawn); this
+// module only hit-tests pointers against those rectangles. Gamepads (for example an
+// 8BitDo Pro 2) are polled once per frame via poll(), which the game calls before it
+// reads the sample.
+
+const STICK_DEADZONE = 0.3; // ignore small resting drift on the left stick
 
 export class Input {
   constructor(canvas) {
@@ -13,14 +17,75 @@ export class Input {
     this._restart = false;
     this._muteToggle = false;
 
+    // Cached gamepad state, refreshed each frame by poll().
+    this._padSteer = 0;
+    this._padBoost = false;
+    this._padPrev = {}; // last pressed-state per named button, for rising-edge detection
+    this._padIndex = null;
+
     window.addEventListener('keydown', (e) => this._onKey(e, true));
     window.addEventListener('keyup', (e) => this._onKey(e, false));
+
+    window.addEventListener('gamepadconnected', (e) => {
+      // Latch onto the first pad we see; the browser only surfaces it after a button
+      // press, so this fires the moment the controller is actually used.
+      if (this._padIndex === null) this._padIndex = e.gamepad.index;
+    });
+    window.addEventListener('gamepaddisconnected', (e) => {
+      if (this._padIndex === e.gamepad.index) {
+        this._padIndex = null;
+        this._padSteer = 0;
+        this._padBoost = false;
+        this._padPrev = {};
+      }
+    });
 
     canvas.addEventListener('pointerdown', (e) => this._onPointer(e, true));
     canvas.addEventListener('pointermove', (e) => this._onPointer(e, null));
     canvas.addEventListener('pointerup', (e) => this._onPointer(e, false));
     canvas.addEventListener('pointercancel', (e) => this._onPointer(e, false));
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  // Read the active gamepad once per frame. Fills the steer/boost cache that sample()
+  // merges in, and raises the restart/mute one-shots on a button's rising edge.
+  poll() {
+    const pads = (navigator.getGamepads && navigator.getGamepads()) || [];
+    let pad = this._padIndex !== null ? pads[this._padIndex] : null;
+    if (!pad) {
+      // Fall back to the first connected pad — covers browsers that populate the array
+      // without ever firing gamepadconnected.
+      for (const p of pads) { if (p) { pad = p; this._padIndex = p.index; break; } }
+    }
+    if (!pad) {
+      this._padSteer = 0;
+      this._padBoost = false;
+      return;
+    }
+
+    const axis = pad.axes && pad.axes.length > 0 ? pad.axes[0] : 0;
+    const pressed = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed);
+
+    // Steer: left stick X (with a deadzone) or the D-pad. Standard mapping puts the
+    // D-pad on buttons 14 (left) and 15 (right).
+    let steer = Math.abs(axis) > STICK_DEADZONE ? axis : 0;
+    if (pressed(14)) steer -= 1;
+    if (pressed(15)) steer += 1;
+    this._padSteer = Math.max(-1, Math.min(1, steer));
+
+    // Boost: forgiving — any of the face buttons, shoulders, or triggers. This keeps
+    // working whichever button a player reaches for to accelerate.
+    this._padBoost = pressed(0) || pressed(1) || pressed(4) || pressed(5) || pressed(6) || pressed(7);
+
+    // One-shots on rising edge. Start (9) restarts; Select/Back (8) toggles mute.
+    if (this._padEdge('restart', pressed(9))) this._restart = true;
+    if (this._padEdge('mute', pressed(8))) this._muteToggle = true;
+  }
+
+  _padEdge(name, isDown) {
+    const was = this._padPrev[name];
+    this._padPrev[name] = isDown;
+    return isDown && !was;
   }
 
   _onKey(e, down) {
@@ -76,6 +141,10 @@ export class Input {
 
     let boost = k.has(' ') || k.has('arrowup') || k.has('w');
     if (this._anyPointerIn(this.buttons.boost)) boost = true;
+
+    // Fold in the gamepad state gathered by the last poll().
+    steer += this._padSteer;
+    if (this._padBoost) boost = true;
 
     return { steer: Math.max(-1, Math.min(1, steer)), boost };
   }
