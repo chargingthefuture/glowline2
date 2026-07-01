@@ -29,6 +29,7 @@ export class Ship {
     this.angle = angle;
     this.charge = 0;
     this.grinding = false;
+    this.impact = 0;
     this.speed = 40;
     this.trail.length = 0;
   }
@@ -74,6 +75,7 @@ export class Ship {
 
   _collide(level, dt) {
     this.grinding = false;
+    this.impact = 0; // strongest head-on hit this frame, for the crash sound
     for (const seg of level.nearby(this.pos.x)) {
       const { point } = closestOnSegment(this.pos, seg.a, seg.b);
       const d = sub(this.pos, point);
@@ -99,6 +101,8 @@ export class Ship {
       if (headOn < 0.6 && tSpeed > 40) {
         this.grinding = true;
         this.charge = clamp(this.charge + GRIND_GAIN * (tSpeed / CRUISE_MAX) * (1 - headOn) * dt, 0, 1);
+      } else if (headOn > 0.55 && -vn > 60) {
+        this.impact = Math.max(this.impact, headOn); // a real head-on knock
       }
 
       const keep = 1 - headOn * HEADON_PENALTY;
