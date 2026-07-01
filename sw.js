@@ -1,7 +1,7 @@
 // Glowline 2 service worker — precache every file the game loads so it runs fully
 // offline and installs as an app. Bump CACHE whenever any listed file changes, so
 // already-installed copies fetch the new version instead of an out-of-date cached one.
-const CACHE = 'glowline2-v1';
+const CACHE = 'glowline2-v2';
 
 const ASSETS = [
   './',
@@ -37,17 +37,18 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Cache-first: instant loads and full offline play. Falls back to the network, and
-// for page navigations falls back to the cached shell.
+// Stale-while-revalidate: serve the cached copy instantly (so the game still opens
+// offline and loads fast), but always fetch a fresh copy in the background and store
+// it, so the next visit picks up new code without waiting on a cache-version bump.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
+  const sameOrigin = new URL(request.url).origin === self.location.origin;
   event.respondWith(
     caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request)
+      const network = fetch(request)
         .then((res) => {
-          if (res.ok && new URL(request.url).origin === self.location.origin) {
+          if (res.ok && sameOrigin) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put(request, copy));
           }
@@ -55,7 +56,10 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           if (request.mode === 'navigate') return caches.match('./index.html');
+          return cached; // offline and not cached above: nothing more to try
         });
+      // Cached copy first if we have one; the background fetch refreshes it.
+      return cached || network;
     })
   );
 });

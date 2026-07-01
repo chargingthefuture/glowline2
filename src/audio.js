@@ -9,8 +9,17 @@ let master = null;      // everything routes through here; muting sets it to 0
 let grindGain = null;   // the continuous wall-grinding hiss
 let grindFilter = null;
 let grindOn = false;    // whether the hiss is currently faded in
+let musicGain = null;   // background music bus, sits under the sound effects
+let musicStep = 0;      // position in the arpeggio
+let musicTimer = null;  // the setTimeout that steps the sequence
 let started = false;
 let muted = readMuted();
+
+// Background music: a gentle A-minor arpeggio with a soft octave shimmer and a
+// slow sawtooth bass, ported from Glowline's procedural synthwave. No audio
+// files — every note is a Web Audio oscillator, stepped by a light timer.
+const MUSIC_SCALE = [220.0, 261.63, 293.66, 329.63, 392.0, 440.0]; // A3 C4 D4 E4 G4 A4
+const MUSIC_BASS = [110.0, 130.81, 146.83, 98.0];                  // A2 C3 D3 G2
 
 function readMuted() {
   try { return localStorage.getItem('glowline2.muted') === '1'; } catch (_) { return false; }
@@ -67,8 +76,38 @@ export function start() {
   noise.connect(grindFilter).connect(grindGain).connect(master);
   noise.start();
 
+  // Background music bus, kept a little quieter than the effects.
+  musicGain = ctx.createGain();
+  musicGain.gain.value = 0.5;
+  musicGain.connect(master);
+
   started = true;
   if (ctx.state === 'suspended') ctx.resume();
+
+  // Kick off the arpeggio loop.
+  musicStep = 0;
+  musicTick();
+}
+
+// One step of the background music, scheduled slightly ahead and re-armed on a
+// timer so the loop keeps running for as long as the game is open.
+function musicTick() {
+  if (!ctx) return;
+  clearTimeout(musicTimer);
+  const t = now() + 0.06;
+  const beat = 0.5; // seconds per arpeggio step
+  const s = musicStep;
+
+  // Arpeggio, dropping an octave for the second half of each 12-step phrase.
+  const note = MUSIC_SCALE[s % MUSIC_SCALE.length] * (s % 12 < 6 ? 1 : 0.5);
+  tone(note, t, 0.45, 'triangle', 0.12, musicGain);
+  // A soft higher shimmer every other step.
+  if (s % 2 === 0) tone(note * 2, t, 0.6, 'sine', 0.05, musicGain);
+  // A slow bass note every four steps.
+  if (s % 4 === 0) tone(MUSIC_BASS[(s / 4) % MUSIC_BASS.length], t, 1.4, 'sawtooth', 0.10, musicGain);
+
+  musicStep++;
+  musicTimer = setTimeout(musicTick, beat * 1000);
 }
 
 export function setMuted(m) {
