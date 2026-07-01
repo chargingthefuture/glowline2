@@ -95,7 +95,8 @@ canvas#game {
   font: inherit;
 }
 .level-card:hover,
-.level-card:focus-visible {
+.level-card:focus-visible,
+.level-card.gp-focus {
   transform: translateY(-2px);
   border-color: var(--accent);
   box-shadow: 0 0 20px rgba(56, 240, 208, 0.25);
@@ -141,7 +142,9 @@ button {
   padding: 12px 20px;
   transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.1s ease;
 }
-button:hover { border-color: var(--accent); }
+button:hover,
+button.gp-focus { border-color: var(--accent); outline: none; }
+button.gp-focus { box-shadow: 0 0 18px rgba(56, 240, 208, 0.4); }
 button:active { transform: translateY(1px); }
 button.primary {
   color: #04121a;

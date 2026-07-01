@@ -22,6 +22,8 @@ export class Input {
     this._padBoost = false;
     this._padPrev = {}; // last pressed-state per named button, for rising-edge detection
     this._padIndex = null;
+    this._nav = 0;      // menu focus move this frame: -1 up/prev, +1 down/next
+    this._confirm = false; // menu "activate the focused item" one-shot
 
     window.addEventListener('keydown', (e) => this._onKey(e, true));
     window.addEventListener('keyup', (e) => this._onKey(e, false));
@@ -80,6 +82,16 @@ export class Input {
     // One-shots on rising edge. Start (9) restarts; Select/Back (8) toggles mute.
     if (this._padEdge('restart', pressed(9))) this._restart = true;
     if (this._padEdge('mute', pressed(8))) this._muteToggle = true;
+
+    // Menu navigation: D-pad or either stick moves the focus, A (0) confirms.
+    // These raise one-shots the game reads while on the menu / win screen; during
+    // play they are simply consumed and ignored. The vertical axis is axes[1].
+    const axisY = pad.axes && pad.axes.length > 1 ? pad.axes[1] : 0;
+    const navPrev = pressed(12) || pressed(14) || axis < -STICK_DEADZONE || axisY < -STICK_DEADZONE;
+    const navNext = pressed(13) || pressed(15) || axis > STICK_DEADZONE || axisY > STICK_DEADZONE;
+    if (this._padEdge('navPrev', navPrev)) this._nav = -1;
+    if (this._padEdge('navNext', navNext)) this._nav = 1;
+    if (this._padEdge('confirm', pressed(0))) this._confirm = true;
   }
 
   _padEdge(name, isDown) {
@@ -159,5 +171,19 @@ export class Input {
     const m = this._muteToggle;
     this._muteToggle = false;
     return m;
+  }
+
+  // -1 (up/prev) / 0 / +1 (down/next) — a single focus step from the gamepad.
+  consumeNav() {
+    const n = this._nav;
+    this._nav = 0;
+    return n;
+  }
+
+  // True once when the gamepad's confirm button (A) was pressed.
+  consumeConfirm() {
+    const c = this._confirm;
+    this._confirm = false;
+    return c;
   }
 }

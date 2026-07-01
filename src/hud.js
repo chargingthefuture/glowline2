@@ -21,6 +21,40 @@ export class Hud {
     document.getElementById('btnNext').addEventListener('click', () => handlers.onNext());
     document.getElementById('btnReplay').addEventListener('click', () => handlers.onReplay());
     document.getElementById('btnMenu').addEventListener('click', () => handlers.onMenu());
+
+    // Focus target for gamepad navigation: the list of focusable buttons on the
+    // overlay that is currently showing, plus which one is highlighted.
+    this._focusEls = [];
+    this._focusIdx = 0;
+  }
+
+  // Gamepad focus helpers ------------------------------------------------
+  // The visible overlay hands its buttons to _setFocus; moveFocus steps through
+  // them and activateFocus clicks the highlighted one. This also drives the
+  // native :focus, so the same highlight works for keyboard Tab users.
+  _setFocus(els) {
+    for (const el of this._focusEls) el.classList.remove('gp-focus');
+    this._focusEls = els.filter(Boolean);
+    this._focusIdx = 0;
+    if (this._focusEls.length) this._applyFocus();
+  }
+
+  _applyFocus() {
+    this._focusEls.forEach((el, i) => el.classList.toggle('gp-focus', i === this._focusIdx));
+    const el = this._focusEls[this._focusIdx];
+    if (el) el.focus({ preventScroll: true });
+  }
+
+  moveFocus(delta) {
+    const n = this._focusEls.length;
+    if (!n) return;
+    this._focusIdx = (this._focusIdx + delta + n) % n;
+    this._applyFocus();
+  }
+
+  activateFocus() {
+    const el = this._focusEls[this._focusIdx];
+    if (el) el.click();
   }
 
   showMenu(levels, bests) {
@@ -39,10 +73,12 @@ export class Hud {
       card.addEventListener('click', () => this.handlers.onSelectLevel(i));
       this.levelList.appendChild(card);
     });
+    this._setFocus([...this.levelList.children]);
   }
 
   hideMenu() {
     this.menu.classList.add('hidden');
+    this._setFocus([]);
   }
 
   showWin({ time, best, isRecord, hasNext }) {
@@ -51,10 +87,17 @@ export class Hud {
     this.winTimes.innerHTML =
       `<div><span class="lbl">time</span> ${formatTime(time)}</div>` +
       `<div class="${isRecord ? 'record' : ''}"><span class="lbl">best</span> ${formatTime(best)}</div>`;
-    document.getElementById('btnNext').style.display = hasNext ? '' : 'none';
+    const btnNext = document.getElementById('btnNext');
+    btnNext.style.display = hasNext ? '' : 'none';
+    this._setFocus([
+      hasNext ? btnNext : null,
+      document.getElementById('btnReplay'),
+      document.getElementById('btnMenu'),
+    ]);
   }
 
   hideWin() {
     this.win.classList.add('hidden');
+    this._setFocus([]);
   }
 }

@@ -108,6 +108,15 @@ export class Game {
       return;
     }
 
+    // Gamepad drives the DOM overlays when we are not in a level. Consume the
+    // one-shots every frame so a press during play never carries over to a menu.
+    const nav = this.input.consumeNav();
+    const confirm = this.input.consumeConfirm();
+    if (this.state === 'menu' || this.state === 'won') {
+      if (nav) this.hud.moveFocus(nav);
+      if (confirm) this.hud.activateFocus();
+    }
+
     if (this.state !== 'playing') {
       audio.grind(false); // no wall hiss on the menu or win screen
       return;
