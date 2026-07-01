@@ -8,9 +8,10 @@ export class Input {
     this.canvas = canvas;
     this.keys = new Set();
     this.pointers = new Map(); // pointerId -> {x, y}
-    this.buttons = { left: null, right: null, boost: null, restart: null };
+    this.buttons = { left: null, right: null, boost: null, restart: null, mute: null };
     this.usingTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
     this._restart = false;
+    this._muteToggle = false;
 
     window.addEventListener('keydown', (e) => this._onKey(e, true));
     window.addEventListener('keyup', (e) => this._onKey(e, false));
@@ -24,10 +25,11 @@ export class Input {
 
   _onKey(e, down) {
     const k = e.key.toLowerCase();
-    if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'a', 'd', 'w', 'r'].includes(k)) {
+    if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'a', 'd', 'w', 'r', 'm'].includes(k)) {
       e.preventDefault();
     }
     if (down && k === 'r') this._restart = true;
+    if (down && k === 'm') this._muteToggle = true;
     if (down) this.keys.add(k);
     else this.keys.delete(k);
   }
@@ -40,6 +42,7 @@ export class Input {
     if (down === true) {
       this.pointers.set(e.pointerId, pt);
       if (this._hit(this.buttons.restart, pt)) this._restart = true;
+      if (this._hit(this.buttons.mute, pt)) this._muteToggle = true;
     } else if (down === false) {
       this.pointers.delete(e.pointerId);
     } else if (this.pointers.has(e.pointerId)) {
@@ -81,5 +84,11 @@ export class Input {
     const r = this._restart;
     this._restart = false;
     return r;
+  }
+
+  consumeMuteToggle() {
+    const m = this._muteToggle;
+    this._muteToggle = false;
+    return m;
   }
 }

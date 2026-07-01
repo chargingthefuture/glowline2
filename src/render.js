@@ -5,6 +5,7 @@
 
 import { SHIP_CRUISE_MAX, SHIP_BOOST_MAX } from './ship.js';
 import { formatTime } from './hud.js';
+import { isMuted } from './audio.js';
 
 export class Renderer {
   constructor(canvas) {
@@ -14,6 +15,17 @@ export class Renderer {
     this.W = 0;
     this.H = 0;
     this.scale = 1;
+    this.safe = { top: 0, right: 0, bottom: 0, left: 0 };
+
+    // A hidden probe whose padding is the device's safe-area insets (the space
+    // under a notch or home indicator). Reading its computed padding is the only
+    // way to get those numbers into the canvas layout.
+    this._safeProbe = document.createElement('div');
+    this._safeProbe.style.cssText =
+      'position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+      'padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);';
+    document.body.appendChild(this._safeProbe);
+
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -27,18 +39,31 @@ export class Renderer {
     this.W = cssW;
     this.H = cssH;
     this.scale = cssH / 720; // world units of height kept in view
+
+    const cs = getComputedStyle(this._safeProbe);
+    this.safe = {
+      top: parseFloat(cs.paddingTop) || 0,
+      right: parseFloat(cs.paddingRight) || 0,
+      bottom: parseFloat(cs.paddingBottom) || 0,
+      left: parseFloat(cs.paddingLeft) || 0,
+    };
   }
 
   // Layout of the on-screen buttons, returned so input can hit-test them.
   buttonLayout() {
+    const s = this.safe;
     const m = 20;
     const b = Math.max(60, Math.min(this.W, this.H) * 0.14);
     const big = b * 1.2;
+    const bottom = this.H - m - s.bottom;
+    const top = 12 + s.top;
+    const rightEdge = this.W - 12 - s.right;
     return {
-      left: { x: m, y: this.H - m - b, w: b, h: b },
-      right: { x: m + b + 12, y: this.H - m - b, w: b, h: b },
-      boost: { x: this.W - m - big, y: this.H - m - big, w: big, h: big },
-      restart: { x: this.W - 12 - 44, y: 12, w: 44, h: 44 },
+      left: { x: m + s.left, y: bottom - b, w: b, h: b },
+      right: { x: m + s.left + b + 12, y: bottom - b, w: b, h: b },
+      boost: { x: this.W - m - s.right - big, y: bottom - big, w: big, h: big },
+      restart: { x: rightEdge - 44, y: top, w: 44, h: 44 },
+      mute: { x: rightEdge - 44 - 8 - 44, y: top, w: 44, h: 44 },
     };
   }
 
@@ -199,6 +224,7 @@ export class Renderer {
 
   _hud(game) {
     const ctx = this.ctx;
+    const st = this.safe;
     ctx.save();
     ctx.textBaseline = 'top';
 
@@ -206,23 +232,23 @@ export class Renderer {
     ctx.font = '600 14px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(180,200,255,0.7)';
     ctx.textAlign = 'left';
-    ctx.fillText(game.level.name.toUpperCase(), 16, 16);
+    ctx.fillText(game.level.name.toUpperCase(), 16 + st.left, 16 + st.top);
 
     // Timer (top-centre).
     ctx.font = '700 30px system-ui, sans-serif';
     ctx.fillStyle = '#eaf6ff';
     ctx.textAlign = 'center';
-    ctx.fillText(formatTime(game.time), this.W / 2, 12);
+    ctx.fillText(formatTime(game.time), this.W / 2, 12 + st.top);
 
     ctx.font = '500 12px system-ui, sans-serif';
     ctx.fillStyle = 'rgba(180,200,255,0.55)';
     const bestTxt = game.best != null ? `best ${formatTime(game.best)}` : `par ${formatTime(game.level.par)}`;
-    ctx.fillText(bestTxt, this.W / 2, 48);
+    ctx.fillText(bestTxt, this.W / 2, 48 + st.top);
 
     // Boost meter (bottom-centre).
     const mw = Math.min(240, this.W * 0.5);
     const mx = (this.W - mw) / 2;
-    const my = this.H - 26;
+    const my = this.H - 26 - st.bottom;
     ctx.fillStyle = 'rgba(20,28,52,0.85)';
     roundRect(ctx, mx, my, mw, 10, 5);
     ctx.fill();
@@ -248,10 +274,10 @@ export class Renderer {
     // Progress bar under the timer.
     const prog = Math.max(0, Math.min(1, (game.ship.pos.x - game.level.start.x) / (game.level.finishX - game.level.start.x)));
     ctx.fillStyle = 'rgba(120,150,220,0.25)';
-    roundRect(ctx, this.W / 2 - 90, 70, 180, 4, 2);
+    roundRect(ctx, this.W / 2 - 90, 70 + st.top, 180, 4, 2);
     ctx.fill();
     ctx.fillStyle = game.level.theme.wall;
-    roundRect(ctx, this.W / 2 - 90, 70, 180 * prog, 4, 2);
+    roundRect(ctx, this.W / 2 - 90, 70 + st.top, 180 * prog, 4, 2);
     ctx.fill();
 
     ctx.restore();
@@ -260,9 +286,9 @@ export class Renderer {
   }
 
   _buttons(game) {
-    const ctx = this.ctx;
     const L = this.buttonLayout();
-    // Restart is always shown.
+    // Mute and restart are always shown (mute state comes from the audio module).
+    this._btn(L.mute, isMuted() ? '🔇' : '🔊', 0.5);
     this._btn(L.restart, '↺', 0.5);
     if (!game.showTouch) return;
     this._btn(L.left, '◀', 0.4);

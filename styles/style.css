@@ -40,7 +40,10 @@ canvas#game {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  /* Keep content clear of a notch or home indicator on phones. */
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+           max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  overflow-y: auto;
   background: radial-gradient(circle at 50% 30%, rgba(20, 26, 54, 0.72), rgba(5, 6, 13, 0.94));
   backdrop-filter: blur(2px);
 }

@@ -3,10 +3,11 @@
 
 import { LEVELS } from './levels.js';
 import { Level } from './level.js';
-import { Ship } from './ship.js';
+import { Ship, SHIP_BOOST_MAX } from './ship.js';
 import { Input } from './input.js';
 import { Renderer } from './render.js';
 import { Hud } from './hud.js';
+import * as audio from './audio.js';
 
 const BEST_KEY = (i) => `glowline2.best.${i}`;
 
@@ -29,6 +30,14 @@ export class Game {
     this.best = null;
     this.camera = { x: 0, y: 0 };
     this.showTouch = this.input.usingTouch;
+    this._prevBoosting = false;
+    this._crashCd = 0; // stops the crash thud from firing every frame of a hit
+
+    // Sound must be unlocked by a user gesture; start() is safe to call repeatedly
+    // and also resumes the audio if the browser suspended it.
+    const kick = () => audio.start();
+    window.addEventListener('pointerdown', kick);
+    window.addEventListener('keydown', kick);
 
     this.toMenu();
     this._last = null;
@@ -55,12 +64,17 @@ export class Game {
     this.camera = { x: this.level.start.x, y: this.level.start.y };
     this.time = 0;
     this.state = 'playing';
+    this._prevBoosting = false;
+    this._crashCd = 0;
+    audio.grind(false);
     this.hud.hideMenu();
     this.hud.hideWin();
   }
 
   _win() {
     this.state = 'won';
+    audio.grind(false);
+    audio.finish();
     const prev = this.bestTime(this.levelIndex);
     const isRecord = prev == null || this.time < prev;
     if (isRecord) localStorage.setItem(BEST_KEY(this.levelIndex), this.time.toFixed(3));
@@ -76,20 +90,40 @@ export class Game {
   _respawn() {
     const cp = this.level.lastCheckpoint(this.ship.pos.x);
     this.ship.reset({ x: cp, y: this.level.midYAt(cp), angle: 0 });
+    this._prevBoosting = false;
+    audio.respawn();
   }
 
   _update(dt) {
     this.showTouch = this.input.usingTouch;
+
+    if (this.input.consumeMuteToggle()) {
+      audio.toggleMute();
+      audio.blip(); // audible only when turning sound back on
+    }
 
     if (this.input.consumeRestart() && this.level) {
       this.startLevel(this.levelIndex);
       return;
     }
 
-    if (this.state !== 'playing') return;
+    if (this.state !== 'playing') {
+      audio.grind(false); // no wall hiss on the menu or win screen
+      return;
+    }
 
     this.ship.update(dt, this.input.sample(), this.level);
     this.time += dt;
+
+    // Sound tied to what the ship is doing this frame.
+    audio.grind(this.ship.grinding, Math.min(1, this.ship.speed / SHIP_BOOST_MAX));
+    if (this.ship.boosting && !this._prevBoosting) audio.boost();
+    this._prevBoosting = this.ship.boosting;
+    this._crashCd -= dt;
+    if (this.ship.impact > 0.6 && this._crashCd <= 0) {
+      audio.crash(this.ship.impact);
+      this._crashCd = 0.25;
+    }
 
     // Fell out of the maze -> back to the last checkpoint.
     const b = this.level.bounds;
