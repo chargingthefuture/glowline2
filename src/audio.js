@@ -8,6 +8,7 @@ let ctx = null;
 let master = null;      // everything routes through here; muting sets it to 0
 let grindGain = null;   // the continuous wall-grinding hiss
 let grindFilter = null;
+let grindOn = false;    // whether the hiss is currently faded in
 let started = false;
 let muted = readMuted();
 
@@ -99,9 +100,23 @@ function tone(freq, t, dur, type, peak, dest) {
 // `intensity` (0..1) brightens it with speed.
 export function grind(active, intensity = 1) {
   if (!grindGain) return;
-  const target = active ? 0.05 + 0.05 * intensity : 0;
-  grindGain.gain.setTargetAtTime(target, now(), 0.06);
-  grindFilter.frequency.setTargetAtTime(700 + 1600 * intensity, now(), 0.06);
+  const t = now();
+  if (active) {
+    const target = 0.05 + 0.05 * intensity;
+    grindGain.gain.cancelScheduledValues(t);
+    grindGain.gain.setTargetAtTime(target, t, 0.06);
+    grindFilter.frequency.setTargetAtTime(700 + 1600 * intensity, t, 0.06);
+    grindOn = true;
+  } else if (grindOn) {
+    // Fade out once, then pin the gain to a hard zero. setTargetAtTime only
+    // approaches its target, so on its own it leaves the noise source running at
+    // a tiny residual gain — an audible constant hiss on quiet screens. The
+    // scheduled zero guarantees true silence when we are not grinding a wall.
+    grindGain.gain.cancelScheduledValues(t);
+    grindGain.gain.setTargetAtTime(0, t, 0.05);
+    grindGain.gain.setValueAtTime(0, t + 0.3);
+    grindOn = false;
+  }
 }
 
 export function boost() {
