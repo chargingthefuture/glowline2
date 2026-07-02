@@ -38,8 +38,8 @@ canvas#game {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   /* Keep content clear of a notch or home indicator on phones. */
   padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
            max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
@@ -53,6 +53,10 @@ canvas#game {
 .panel {
   width: min(560px, 100%);
   text-align: center;
+  /* Auto top/bottom margins centre the panel when it fits, but collapse to 0 when
+     it is taller than the screen — so the top stays reachable and the whole list
+     scrolls. (Flex align/justify centring hides the overflowing top instead.) */
+  margin: auto 0;
 }
 
 .logo {
