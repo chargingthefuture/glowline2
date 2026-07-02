@@ -149,4 +149,58 @@ function level5() {
   };
 }
 
-export const LEVELS = [level1(), level2(), level3(), level4(), level5()];
+// --- Level 6: steep switchbacks with pinch pillars. The corridor swings hard and
+// narrow, so you have to slide the outer wall of each bend to hold your speed
+// through it rather than nose in and stall. -------------------------------
+function level6() {
+  const length = 7600;
+  const mid = (x) => 640 + Math.sin(x / 360) * 330 + Math.sin(x / 120) * 40;
+  const half = (x) => 92 - Math.sin(x / 650) * 10;
+  const { top, bottom } = corridor({ length, mid, half });
+  const walls = [top, bottom];
+  for (let x = 1000; x < length - 700; x += 520) {
+    const s = ((x / 520) | 0) % 2 ? 1 : -1;
+    walls.push(pillar(x, mid(x) + s * 44, 40, 60, 5, s * 0.5));
+  }
+  return {
+    name: 'Hairpins',
+    theme: { wall: '#5cff9e', glow: 'rgba(92,255,158,0.5)', accent: '#b9ffd6' },
+    par: 52,
+    start: { x: 120, y: mid(120), angle: 0 },
+    finishX: length - 200,
+    bounds: { left: -80, right: length + 80, top: -500, bottom: 1700 },
+    checkpoints: [1500, 3000, 4500, 6000, 7000],
+    walls,
+  };
+}
+
+// --- Level 7: heavy gravity through a tight, winding cave with teeth from both
+// sides. The pull is strong and the gaps are small, so you grind the roof and
+// floor to keep the boost charged and thread each gate. --------------------
+function level7() {
+  const length = 7400;
+  const mid = (x) => 700 + Math.sin(x / 520) * 300 + Math.cos(x / 175) * 44;
+  const half = (x) => 104 - Math.sin(x / 720) * 14;
+  const { top, bottom } = corridor({ length, mid, half });
+  const walls = [top, bottom];
+  for (let x = 900; x < length - 700; x += 470) {
+    const ceiling = ((x / 470) | 0) % 2 === 0;
+    const m = mid(x);
+    const h = half(x);
+    const y = ceiling ? m - h + 46 : m + h - 46;
+    walls.push(pillar(x, y, 30, 58, 4, Math.PI / 4));
+  }
+  return {
+    name: 'Riptide',
+    theme: { wall: '#ff5cc8', glow: 'rgba(255,92,200,0.5)', accent: '#ffb3e6' },
+    par: 58,
+    gravity: { x: 0, y: 300 },
+    start: { x: 120, y: mid(120), angle: 0 },
+    finishX: length - 220,
+    bounds: { left: -80, right: length + 80, top: -600, bottom: 1800 },
+    checkpoints: [1400, 2800, 4200, 5600, 6800],
+    walls,
+  };
+}
+
+export const LEVELS = [level1(), level2(), level3(), level4(), level5(), level6(), level7()];
