@@ -1,7 +1,7 @@
 // Glowline 2 service worker — precache every file the game loads so it runs fully
 // offline and installs as an app. Bump CACHE whenever any listed file changes, so
 // already-installed copies fetch the new version instead of an out-of-date cached one.
-const CACHE = 'glowline2-v2';
+const CACHE = 'glowline2-v3';
 
 const ASSETS = [
   './',
