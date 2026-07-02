@@ -26,6 +26,54 @@ function pillar(cx, cy, rx, ry, sides = 6, rot = 0) {
   return pts;
 }
 
+// A closed ellipse outline — used for circuit walls (an outer ring and an inner
+// island together make a lap track).
+function ellipse(cx, cy, rx, ry, n = 72) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    pts.push({ x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry });
+  }
+  return pts;
+}
+
+// A figure-eight tube. The centreline is a Gerono lemniscate (a sideways 8); the
+// walls are that line pushed out by a half-width on each side. Wall points inside
+// `gap` of the centre are dropped, so the two arms of the 8 meet in an open crossing
+// you drive straight through — the loop genuinely crosses itself. Returns the wall
+// polylines split at those gaps.
+function eightTube(cx, cy, a, b, half, gap) {
+  const P = (t) => ({ x: cx + a * Math.cos(t), y: cy + (b / 2) * Math.sin(2 * t) });
+  const tangent = (t) => {
+    const dx = -a * Math.sin(t);
+    const dy = b * Math.cos(2 * t);
+    const m = Math.hypot(dx, dy);
+    return { x: dx / m, y: dy / m };
+  };
+  const n = 220;
+  const sides = [[], []];
+  for (let i = 0; i <= n; i++) {
+    const t = (i / n) * Math.PI * 2;
+    const p = P(t);
+    const tv = tangent(t);
+    const nrm = { x: -tv.y, y: tv.x }; // left normal
+    for (const [s, sign] of [[0, 1], [1, -1]]) {
+      const q = { x: p.x + nrm.x * half * sign, y: p.y + nrm.y * half * sign };
+      sides[s].push(Math.hypot(q.x - cx, q.y - cy) > gap ? q : null);
+    }
+  }
+  const walls = [];
+  for (const arr of sides) {
+    let cur = [];
+    for (const q of arr) {
+      if (q) cur.push(q);
+      else { if (cur.length > 1) walls.push(cur); cur = []; }
+    }
+    if (cur.length > 1) walls.push(cur);
+  }
+  return walls;
+}
+
 // --- Level 1: wide, gentle waves, room to learn the wall-riding. ---------
 function level1() {
   const length = 5200;
@@ -203,4 +251,50 @@ function level7() {
   };
 }
 
-export const LEVELS = [level1(), level2(), level3(), level4(), level5(), level6(), level7()];
+// --- Level 8: a circuit. Race the oval three times and beat the clock. The bends
+// are long, so you carry speed by leaning on the outer wall through each one. ----
+function level8() {
+  const Cx = 1400, Cy = 760;
+  const ORx = 1000, ORy = 560, IRx = 560, IRy = 210;
+  return {
+    name: 'Speedway',
+    theme: { wall: '#ffd54a', glow: 'rgba(255,213,74,0.5)', accent: '#ffe9a0' },
+    par: 40,
+    circuit: {
+      laps: 3,
+      // Start/finish line across the right side of the track; cross it heading down.
+      line: { a: { x: Cx + IRx, y: Cy }, b: { x: Cx + ORx, y: Cy }, forward: { x: 0, y: 1 } },
+      // The check gate on the far side; you must round it before a lap counts.
+      check: { x: Cx - (ORx + IRx) / 2, y: Cy, r: 220 },
+    },
+    start: { x: Cx + (ORx + IRx) / 2, y: Cy - 40, angle: Math.PI / 2 },
+    bounds: { left: Cx - ORx - 120, right: Cx + ORx + 120, top: Cy - ORy - 120, bottom: Cy + ORy + 120 },
+    checkpoints: [],
+    walls: [ellipse(Cx, Cy, ORx, ORy), ellipse(Cx, Cy, IRx, IRy)],
+  };
+}
+
+// --- Level 9: a figure-eight circuit. The track crosses itself in the middle, so
+// each lap runs both loops and threads the open crossing twice. Two laps, on the
+// clock. -----------------------------------------------------------------------
+function level9() {
+  const Cx = 1500, Cy = 780, A = 820, B = 1040, half = 180, gap = 210;
+  return {
+    name: 'Crossover',
+    theme: { wall: '#7c5cff', glow: 'rgba(124,92,255,0.55)', accent: '#c3b4ff' },
+    par: 36,
+    circuit: {
+      laps: 2,
+      line: { a: { x: Cx + A - half, y: Cy }, b: { x: Cx + A + half, y: Cy }, forward: { x: 0, y: 1 } },
+      check: { x: Cx - A, y: Cy, r: 220 },
+    },
+    start: { x: Cx + A, y: Cy - 40, angle: Math.PI / 2 },
+    bounds: { left: Cx - A - 160, right: Cx + A + 160, top: Cy - B / 2 - 260, bottom: Cy + B / 2 + 260 },
+    checkpoints: [],
+    walls: eightTube(Cx, Cy, A, B, half, gap),
+  };
+}
+
+export const LEVELS = [
+  level1(), level2(), level3(), level4(), level5(), level6(), level7(), level8(), level9(),
+];

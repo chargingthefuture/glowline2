@@ -80,8 +80,12 @@ export class Renderer {
     const cam = game.camera;
     this._grid(cam);
     this._walls(game.level, cam);
-    this._checkpoints(game.level, cam);
-    this._finish(game.level, cam, game.time);
+    if (game.level.circuit) {
+      this._circuit(game.level, cam, game.time);
+    } else {
+      this._checkpoints(game.level, cam);
+      this._finish(game.level, cam, game.time);
+    }
     this._ship(game.ship, game.level.theme, cam);
     this._hud(game);
     return this.buttonLayout();
@@ -183,6 +187,52 @@ export class Renderer {
     ctx.restore();
   }
 
+  // Circuit markers: the checkered start/finish line and a faint ring for the
+  // mid-loop check gate you must round each lap.
+  _circuit(level, cam, time) {
+    const ctx = this.ctx;
+    const c = level.circuit;
+    const pulse = 0.6 + 0.4 * Math.sin(time * 5);
+    ctx.save();
+
+    if (c.check) {
+      const g = this.toScreen(cam, c.check.x, c.check.y);
+      ctx.strokeStyle = 'rgba(140,170,255,0.25)';
+      ctx.setLineDash([5, 9]);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, c.check.r * this.scale, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    const a = this.toScreen(cam, c.line.a.x, c.line.a.y);
+    const b = this.toScreen(cam, c.line.b.x, c.line.b.y);
+    ctx.shadowColor = 'rgba(255,255,255,0.8)';
+    ctx.shadowBlur = 18 * pulse;
+    ctx.strokeStyle = `rgba(255,255,255,${0.55 + 0.35 * pulse})`;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    // Checkered blocks along the line.
+    ctx.shadowBlur = 0;
+    const n = 10;
+    for (let i = 0; i < n; i++) {
+      if (i % 2) continue;
+      const t0 = i / n;
+      const t1 = (i + 1) / n;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0);
+      ctx.lineTo(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   _ship(ship, theme, cam) {
     const ctx = this.ctx;
     // Trail.
@@ -271,8 +321,18 @@ export class Renderer {
     ctx.fillStyle = 'rgba(180,200,255,0.5)';
     ctx.fillText(`${spd}%`, mx - 12, my - 4);
 
-    // Progress bar under the timer.
-    const prog = Math.max(0, Math.min(1, (game.ship.pos.x - game.level.start.x) / (game.level.finishX - game.level.start.x)));
+    // Progress under the timer: lap count for circuits, distance for sprints.
+    let prog;
+    if (game.level.circuit) {
+      const laps = game.level.circuit.laps;
+      prog = Math.max(0, Math.min(1, game.lap / laps));
+      ctx.font = '700 12px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(180,200,255,0.7)';
+      ctx.textAlign = 'center';
+      ctx.fillText(`LAP ${Math.min(game.lap + 1, laps)} / ${laps}`, this.W / 2, 86 + st.top);
+    } else {
+      prog = Math.max(0, Math.min(1, (game.ship.pos.x - game.level.start.x) / (game.level.finishX - game.level.start.x)));
+    }
     ctx.fillStyle = 'rgba(120,150,220,0.25)';
     roundRect(ctx, this.W / 2 - 90, 70 + st.top, 180, 4, 2);
     ctx.fill();

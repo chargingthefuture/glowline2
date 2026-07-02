@@ -81,12 +81,16 @@ export class Hud {
     this._setFocus([]);
   }
 
-  showWin({ time, best, isRecord, hasNext }) {
+  showWin({ time, best, isRecord, par, beatPar, hasNext }) {
     this.win.classList.remove('hidden');
     this.winTitle.textContent = isRecord ? 'New record!' : 'Finished';
+    const parRow = par != null
+      ? `<div class="${beatPar ? 'record' : ''}"><span class="lbl">${beatPar ? 'under par' : 'par'}</span> ${formatTime(par)}</div>`
+      : '';
     this.winTimes.innerHTML =
       `<div><span class="lbl">time</span> ${formatTime(time)}</div>` +
-      `<div class="${isRecord ? 'record' : ''}"><span class="lbl">best</span> ${formatTime(best)}</div>`;
+      `<div class="${isRecord ? 'record' : ''}"><span class="lbl">best</span> ${formatTime(best)}</div>` +
+      parRow;
     const btnNext = document.getElementById('btnNext');
     btnNext.style.display = hasNext ? '' : 'none';
     this._setFocus([
