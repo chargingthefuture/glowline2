@@ -12,6 +12,9 @@ export class Level {
     this.bounds = def.bounds;
     this.checkpoints = def.checkpoints || [];
     this.gravity = def.gravity || { x: 0, y: 0 };
+    // A circuit level is a closed loop raced for a number of laps against the clock,
+    // rather than a point-to-point sprint. { laps, line:{a,b,forward}, check:{x,y,r} }.
+    this.circuit = def.circuit || null;
 
     this.segments = [];
     for (const poly of def.walls) {

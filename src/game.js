@@ -64,6 +64,12 @@ export class Game {
     this.time = 0;
     this.state = 'playing';
     this._prevBoosting = false;
+    // Circuit lap tracking. A lap counts when the ship crosses the finish line in
+    // the forward direction, but only after it has touched the mid-loop check gate
+    // (so you can't score laps by wiggling back and forth over the line).
+    this.lap = 0;
+    this._lapArmed = false;
+    this._prevPos = { x: this.level.start.x, y: this.level.start.y };
     this.hud.hideMenu();
     this.hud.hideWin();
   }
@@ -79,15 +85,49 @@ export class Game {
       time: this.time,
       best: this.best,
       isRecord,
+      par: this.level.par,
+      beatPar: this.time <= this.level.par,
       hasNext: this.levelIndex < LEVELS.length - 1,
     });
   }
 
   _respawn() {
-    const cp = this.level.lastCheckpoint(this.ship.pos.x);
-    this.ship.reset({ x: cp, y: this.level.midYAt(cp), angle: 0 });
+    if (this.level.circuit) {
+      // On a loop, drop back to the start line. Disarm the lap so you still have to
+      // round the check gate again — no free lap from the respawn.
+      this.ship.reset(this.level.start);
+      this._lapArmed = false;
+    } else {
+      const cp = this.level.lastCheckpoint(this.ship.pos.x);
+      this.ship.reset({ x: cp, y: this.level.midYAt(cp), angle: 0 });
+    }
+    this._prevPos = { x: this.ship.pos.x, y: this.ship.pos.y };
     this._prevBoosting = false;
     audio.respawn();
+  }
+
+  // Count laps on a circuit: arm when the ship touches the mid-loop check gate, and
+  // score a lap when it then crosses the finish line moving in the forward direction.
+  _circuitLaps(prev, cur) {
+    const c = this.level.circuit;
+    if (c.check) {
+      const dx = cur.x - c.check.x;
+      const dy = cur.y - c.check.y;
+      if (dx * dx + dy * dy < c.check.r * c.check.r) this._lapArmed = true;
+    }
+    const L = c.line;
+    const s0 = (prev.x - L.a.x) * L.forward.x + (prev.y - L.a.y) * L.forward.y;
+    const s1 = (cur.x - L.a.x) * L.forward.x + (cur.y - L.a.y) * L.forward.y;
+    if (s0 < 0 && s1 >= 0) {
+      const ex = L.b.x - L.a.x;
+      const ey = L.b.y - L.a.y;
+      const t = ((cur.x - L.a.x) * ex + (cur.y - L.a.y) * ey) / (ex * ex + ey * ey);
+      if (t >= -0.1 && t <= 1.1 && this._lapArmed) {
+        this.lap++;
+        this._lapArmed = false;
+        if (this.lap < c.laps) audio.blip(); // a tick for each lap but the last
+      }
+    }
   }
 
   _update(dt) {
@@ -125,13 +165,19 @@ export class Game {
     if (this.ship.boosting && !this._prevBoosting) audio.boost();
     this._prevBoosting = this.ship.boosting;
 
-    // Fell out of the maze -> back to the last checkpoint.
     const b = this.level.bounds;
     const p = this.ship.pos;
-    if (p.y < b.top || p.y > b.bottom || p.x < b.left) this._respawn();
-
-    // Crossed the finish gate.
-    if (p.x >= this.level.finishX) this._win();
+    if (this.level.circuit) {
+      // Loop track: respawn only if the ship leaves the arena entirely.
+      if (p.y < b.top || p.y > b.bottom || p.x < b.left || p.x > b.right) this._respawn();
+      this._circuitLaps(this._prevPos, p);
+      if (this.lap >= this.level.circuit.laps) this._win();
+    } else {
+      // Point-to-point: fell off the back or out of the corridor -> last checkpoint.
+      if (p.y < b.top || p.y > b.bottom || p.x < b.left) this._respawn();
+      if (p.x >= this.level.finishX) this._win();
+    }
+    this._prevPos = { x: p.x, y: p.y };
 
     // Camera follows with a little look-ahead in the travel direction.
     const targetX = p.x + this.ship.vel.x * 0.35 + 120;
