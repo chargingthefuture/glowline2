@@ -6,9 +6,6 @@
 
 let ctx = null;
 let master = null;      // everything routes through here; muting sets it to 0
-let grindGain = null;   // the continuous wall-grinding hiss
-let grindFilter = null;
-let grindOn = false;    // whether the hiss is currently faded in
 let musicGain = null;   // background music bus, sits under the sound effects
 let musicStep = 0;      // position in the arpeggio
 let musicTimer = null;  // the setTimeout that steps the sequence
@@ -26,20 +23,6 @@ function readMuted() {
 }
 
 function now() { return ctx.currentTime; }
-
-// A short looping noise buffer, reused for the grind hiss and the crash thud.
-function makeNoise() {
-  const len = ctx.sampleRate * 0.5;
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  // A fixed pseudo-random sequence (no Math.random needed): a simple LCG.
-  let seed = 1234567;
-  for (let i = 0; i < len; i++) {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    data[i] = (seed / 0x3fffffff) - 1;
-  }
-  return buf;
-}
 
 // iOS treats Web Audio as "ambient" by default, so the ringer/mute switch can
 // silence an installed app entirely. Asking for the "playback" session (where
@@ -62,19 +45,6 @@ export function start() {
   master = ctx.createGain();
   master.gain.value = muted ? 0 : 0.85;
   master.connect(ctx.destination);
-
-  // Continuous grind chain: noise -> band-pass -> gain (starts silent).
-  const noise = ctx.createBufferSource();
-  noise.buffer = makeNoise();
-  noise.loop = true;
-  grindFilter = ctx.createBiquadFilter();
-  grindFilter.type = 'bandpass';
-  grindFilter.frequency.value = 1200;
-  grindFilter.Q.value = 0.8;
-  grindGain = ctx.createGain();
-  grindGain.gain.value = 0;
-  noise.connect(grindFilter).connect(grindGain).connect(master);
-  noise.start();
 
   // Background music bus, kept a little quieter than the effects.
   musicGain = ctx.createGain();
@@ -135,29 +105,6 @@ function tone(freq, t, dur, type, peak, dest) {
 
 // ---- effects (all no-ops until start() runs) ----
 
-// Wall grinding: called every frame. `active` fades the hiss in and out;
-// `intensity` (0..1) brightens it with speed.
-export function grind(active, intensity = 1) {
-  if (!grindGain) return;
-  const t = now();
-  if (active) {
-    const target = 0.05 + 0.05 * intensity;
-    grindGain.gain.cancelScheduledValues(t);
-    grindGain.gain.setTargetAtTime(target, t, 0.06);
-    grindFilter.frequency.setTargetAtTime(700 + 1600 * intensity, t, 0.06);
-    grindOn = true;
-  } else if (grindOn) {
-    // Fade out once, then pin the gain to a hard zero. setTargetAtTime only
-    // approaches its target, so on its own it leaves the noise source running at
-    // a tiny residual gain — an audible constant hiss on quiet screens. The
-    // scheduled zero guarantees true silence when we are not grinding a wall.
-    grindGain.gain.cancelScheduledValues(t);
-    grindGain.gain.setTargetAtTime(0, t, 0.05);
-    grindGain.gain.setValueAtTime(0, t + 0.3);
-    grindOn = false;
-  }
-}
-
 export function boost() {
   if (!ctx) return;
   const t = now() + 0.01;
@@ -172,23 +119,6 @@ export function boost() {
   o.connect(g).connect(master);
   o.start(t);
   o.stop(t + 0.35);
-}
-
-export function crash(strength = 1) {
-  if (!ctx) return;
-  const t = now() + 0.005;
-  const src = ctx.createBufferSource();
-  src.buffer = makeNoise();
-  const f = ctx.createBiquadFilter();
-  f.type = 'lowpass';
-  f.frequency.value = 500;
-  const g = ctx.createGain();
-  const peak = 0.05 + 0.12 * Math.min(1, strength);
-  g.gain.setValueAtTime(peak, t);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-  src.connect(f).connect(g).connect(master);
-  src.start(t);
-  src.stop(t + 0.2);
 }
 
 export function finish() {
