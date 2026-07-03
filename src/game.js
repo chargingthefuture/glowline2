@@ -144,6 +144,12 @@ export class Game {
       return;
     }
 
+    // Back out to the level menu from a level or the win screen.
+    if (this.input.consumeMenu() && this.level) {
+      this.toMenu();
+      return;
+    }
+
     // Gamepad drives the DOM overlays when we are not in a level. Consume the
     // one-shots every frame so a press during play never carries over to a menu.
     const nav = this.input.consumeNav();
