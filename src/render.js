@@ -63,7 +63,8 @@ export class Renderer {
       right: { x: m + s.left + b + 12, y: bottom - b, w: b, h: b },
       boost: { x: this.W - m - s.right - big, y: bottom - big, w: big, h: big },
       restart: { x: rightEdge - 44, y: top, w: 44, h: 44 },
-      mute: { x: rightEdge - 44 - 8 - 44, y: top, w: 44, h: 44 },
+      mute: { x: rightEdge - (44 + 8), y: top, w: 44, h: 44 },
+      home: { x: rightEdge - (44 + 8) * 2, y: top, w: 44, h: 44 },
     };
   }
 
@@ -347,7 +348,8 @@ export class Renderer {
 
   _buttons(game) {
     const L = this.buttonLayout();
-    // Mute and restart are always shown (mute state comes from the audio module).
+    // Home (back to levels), mute, and restart are always shown while in a level.
+    this._btn(L.home, '☰', 0.5);
     this._btn(L.mute, isMuted() ? '🔇' : '🔊', 0.5);
     this._btn(L.restart, '↺', 0.5);
     if (!game.showTouch) return;

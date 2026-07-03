@@ -12,10 +12,11 @@ export class Input {
     this.canvas = canvas;
     this.keys = new Set();
     this.pointers = new Map(); // pointerId -> {x, y}
-    this.buttons = { left: null, right: null, boost: null, restart: null, mute: null };
+    this.buttons = { left: null, right: null, boost: null, restart: null, mute: null, home: null };
     this.usingTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
     this._restart = false;
     this._muteToggle = false;
+    this._menu = false; // "back to the level menu" one-shot
 
     // Cached gamepad state, refreshed each frame by poll().
     this._padSteer = 0;
@@ -75,13 +76,15 @@ export class Input {
     if (pressed(15)) steer += 1;
     this._padSteer = Math.max(-1, Math.min(1, steer));
 
-    // Boost: forgiving — any of the face buttons, shoulders, or triggers. This keeps
-    // working whichever button a player reaches for to accelerate.
-    this._padBoost = pressed(0) || pressed(1) || pressed(4) || pressed(5) || pressed(6) || pressed(7);
+    // Boost: forgiving — A, the shoulders, or the triggers. B is left out because it
+    // is the "back to the menu" button (see below).
+    this._padBoost = pressed(0) || pressed(4) || pressed(5) || pressed(6) || pressed(7);
 
-    // One-shots on rising edge. Start (9) restarts; Select/Back (8) toggles mute.
+    // One-shots on rising edge. Start (9) restarts; Select/Back (8) toggles mute;
+    // B (1) backs out to the level menu.
     if (this._padEdge('restart', pressed(9))) this._restart = true;
     if (this._padEdge('mute', pressed(8))) this._muteToggle = true;
+    if (this._padEdge('menu', pressed(1))) this._menu = true;
 
     // Menu navigation: D-pad or either stick moves the focus, A (0) confirms.
     // These raise one-shots the game reads while on the menu / win screen; during
@@ -102,11 +105,12 @@ export class Input {
 
   _onKey(e, down) {
     const k = e.key.toLowerCase();
-    if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'a', 'd', 'w', 'r', 'm'].includes(k)) {
+    if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'a', 'd', 'w', 'r', 'm', 'escape'].includes(k)) {
       e.preventDefault();
     }
     if (down && k === 'r') this._restart = true;
     if (down && k === 'm') this._muteToggle = true;
+    if (down && k === 'escape') this._menu = true; // back to the level menu
     if (down) this.keys.add(k);
     else this.keys.delete(k);
   }
@@ -120,6 +124,7 @@ export class Input {
       this.pointers.set(e.pointerId, pt);
       if (this._hit(this.buttons.restart, pt)) this._restart = true;
       if (this._hit(this.buttons.mute, pt)) this._muteToggle = true;
+      if (this._hit(this.buttons.home, pt)) this._menu = true;
     } else if (down === false) {
       this.pointers.delete(e.pointerId);
     } else if (this.pointers.has(e.pointerId)) {
@@ -170,6 +175,14 @@ export class Input {
   consumeMuteToggle() {
     const m = this._muteToggle;
     this._muteToggle = false;
+    return m;
+  }
+
+  // True once when the player asked to go back to the level menu (home button,
+  // Escape, or the gamepad's B button).
+  consumeMenu() {
+    const m = this._menu;
+    this._menu = false;
     return m;
   }
 
